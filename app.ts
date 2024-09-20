@@ -272,17 +272,17 @@ app.put('/user/:email', async (req: Request, res: Response) => {
 
 /**
  * @swagger
- * /user/{id}:
+ * /user/{email}:
  *   delete:
- *     summary: Delete a user by ID
- *     description: Remove a user from the database by their unique ID.
+ *     summary: Delete a user by email
+ *     description: Remove a user from the database by their unique email.
  *     tags: [User]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
  *         description: The user's ID
  *     responses:
  *       204:
@@ -292,9 +292,15 @@ app.put('/user/:email', async (req: Request, res: Response) => {
  *       500:
  *         description: Internal server error
  */
-app.delete('/user/:id', async (req: Request, res: Response) => {
+app.delete('/user/:email', async (req: Request, res: Response) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const email = req.params.email;
+
+    // Assuming a function to find the shard ID based on the user ID
+    const shardId = generateShardId(email);
+    const sequelize = getSequelizeInstanceForId(shardId);
+
+    const user = await sequelize.User.findOne({ where: { email } });
     if (user) {
       await user.destroy();
       return res.status(204).send();
