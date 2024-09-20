@@ -203,17 +203,17 @@ app.get('/user/:email', async (req: Request, res: Response) => {
 
 /**
  * @swagger
- * /user/{id}:
+ * /user/{email}:
  *   put:
- *     summary: Update a user by ID
+ *     summary: Update a user by email
  *     description: Update an existing user's details.
  *     tags: [User]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
  *         description: The user's ID
  *     requestBody:
  *       required: true
@@ -225,9 +225,6 @@ app.get('/user/:email', async (req: Request, res: Response) => {
  *               username:
  *                 type: string
  *                 example: john_doe
- *               email:
- *                 type: string
- *                 example: john@example.com
  *               password:
  *                 type: string
  *                 example: newpassword
@@ -239,16 +236,32 @@ app.get('/user/:email', async (req: Request, res: Response) => {
  *       500:
  *         description: Internal server error
  */
-app.put('/user/:id', async (req: Request, res: Response) => {
+app.put('/user/:email', async (req: Request, res: Response) => {
   try {
-    const { username, email, password } = req.body;
-    const user = await User.findByPk(req.params.id);
+    const { username, password } = req.body;
+    const email = req.params.email;
+
+    // Assuming a function to find the shard ID based on the user ID
+    const shardId = generateShardId(email);
+
+    // Get the correct shard
+    const sequelize = getSequelizeInstanceForId(shardId);
+
+    // Find the user in the correct shard
+    const user = await sequelize.User.findOne({ where: { email } });
+
     if (user) {
+      // Update user details
       user.username = username;
       user.email = email;
       user.password = password;
       await user.save();
-      return res.json({ success: true, message: 'Successful', data: user });
+
+      return res.json({
+        success: true,
+        message: 'User updated successfully',
+        data: user,
+      });
     } else {
       return res.status(404).json({ error: 'User not found' });
     }
