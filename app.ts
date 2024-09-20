@@ -27,6 +27,12 @@ setupSwagger(app, BASE_URL);
 //#endregion App Setup
 
 //#region Code here
+app.get('/shard/:str', async (req: Request, res: Response) => {
+  // Example usage
+  let result = generateShardId(req.params.str);
+  return res.status(200).send({ result });
+});
+
 /**
  * @swagger
  * /user:
@@ -112,11 +118,26 @@ app.post('/user', async (req: Request, res: Response) => {
  */
 app.get('/user', async (req: Request, res: Response) => {
   try {
-    // Get the correct shard
-    const sequelize = getSequelizeInstanceForId(3);
+    // Assuming you have a function to get all shard instances
+    const shardIds = [1, 2, 3]; // An array of shard IDs, e.g., [1, 2, 3, ...]
 
-    const users = await sequelize.User.findAll({ include: sequelize.Profile });
-    return res.json({ success: true, message: 'Successful', data: users });
+    const userPromises = shardIds.map(async (shardId) => {
+      const sequelize = getSequelizeInstanceForId(shardId);
+      // Fetch users along with their profile from this shard
+      return sequelize.User.findAll({ include: sequelize.Profile });
+    });
+
+    // Wait for all promises to resolve (users fetched from all shards)
+    const usersFromAllShards = await Promise.all(userPromises);
+
+    // Flatten the array of arrays into a single array of users
+    const allUsers = usersFromAllShards.flat();
+
+    return res.json({
+      success: true,
+      message: 'Users fetched successfully from all shards',
+      data: allUsers,
+    });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
@@ -124,33 +145,57 @@ app.get('/user', async (req: Request, res: Response) => {
 
 /**
  * @swagger
- * /user/{id}:
+ * /user/{email}:
  *   get:
- *     summary: Get a user by ID
- *     description: Retrieve a single user by their unique ID.
+ *     summary: Get user by email
+ *     description: Retrieves a user by their ID.
  *     tags: [User]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
- *         description: The user's ID
+ *           type: string
+ *         description: User email
  *     responses:
  *       200:
- *         description: User details
+ *         description: User retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 username:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 bio:
+ *                   type: string
+ *                 avatarURL:
+ *                   type: string
  *       404:
  *         description: User not found
  *       500:
  *         description: Internal server error
  */
-app.get('/user/:id', async (req: Request, res: Response) => {
+app.get('/user/:email', async (req: Request, res: Response) => {
   try {
-    const user = await User.findByPk(req.params.id);
-    if (user)
-      return res.json({ success: true, message: 'Successful', data: user });
+    const { email } = req.params;
 
-    return res.status(404).json({ error: 'User not found' });
+    const shardId = generateShardId(email); // Function to determine shard based on ID
+    const sequelize = getSequelizeInstanceForId(shardId);
+
+    const user = await sequelize.User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

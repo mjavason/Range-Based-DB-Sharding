@@ -8,12 +8,18 @@ export const SHARD_MAP = [
   { rangeStart: 201, rangeEnd: 300, dbFile: 'shard3.sqlite' },
 ];
 
-export function generateShardId(key: string): number {
-  // Simple hash function based on character codes
-  const hash = key.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+export function generateShardId(str: string) {
+  let hash = 0;
 
-  // Return a shardId between 1 and 3
-  return (hash % 3) + 1;
+  // Create a simple hash from the string
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  // Map the hash to a number between 1 and 3
+  let number = Math.abs(hash % 3) + 1;
+
+  return number;
 }
 
 export function getSequelizeInstanceForId(shardId: number) {
